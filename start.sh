@@ -1954,6 +1954,22 @@ common_docker_env() { # echoes "-e K=V" pairs shared by both nodes (callers word
     "TRANSFORMERS_OFFLINE=1"
     "TRITON_CACHE_DIR=/root/.triton"
     "HF_TOKEN=${HF_TOKEN:-}"
+    # NaN logit sanitization. sglang's own sanitize_nan_logits() is called on
+    # BOTH the normal sampler path (layers/sampler.py) and the EAGLE verify
+    # path (speculative/eagle_utils.py), but is gated behind this env var
+    # which defaults to FALSE upstream (srt/environ.py). Its docstring
+    # describes our exact failure: "NaN logits (e.g. fp16 activation
+    # overflow) are undefined behavior in sampling kernels and can come back
+    # as out-of-vocab token ids" -- i.e. token id 0, which decodes to "!".
+    # With it on, NaN -> -1e30 instead, so a bad logit loses the argmax
+    # rather than winning it.
+    # Relevant upstream: sglang#20043 (NaN in hidden states w/ modelopt_fp4
+    # on Blackwell under CONCURRENT load; NOT caused by spec decode or radix
+    # cache -- reproduced with both disabled; root-caused to FP4 dequant
+    # numerical instability / a race in quantized weight access) and
+    # sglang#19796 (EAGLE verify NaN on radix prefix hit). This is a
+    # mitigation, not a fix -- the NaN still occurs upstream of sampling.
+    "SGLANG_SANITIZE_NAN_LOGITS=${SANITIZE_NAN_LOGITS:-1}"
   )
   local v out=""
   for v in "${vars[@]}"; do out+=" -e ${v}"; done
