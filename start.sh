@@ -505,13 +505,14 @@ preflight() { # $1 = action; port checks only matter when serving
 
   # The configured RoCE device must actually exist on each node: NCCL_IB_HCA naming
   # a device that is not present degrades silently instead of erroring.
-  if ibv_devices 2>/dev/null | grep -qw "${HEAD_CX7_IB}"; then
+  if ibv_devices 2>/dev/null | grep -qwF -f <(echo "${HEAD_CX7_IB}" | tr "," "
+"); then
     ok "head RoCE device ${HEAD_CX7_IB} present"
   else
     error "head RoCE device '${HEAD_CX7_IB}' not in ibv_devices — fix HEAD_CX7_IB"
     exit 1
   fi
-  if wrun "ibv_devices 2>/dev/null | grep -qw '${WORKER_CX7_IB}'"; then
+  if wrun "ibv_devices 2>/dev/null | grep -qwF -f <(echo '${WORKER_CX7_IB}' | tr ',' '\n')"; then
     ok "worker RoCE device ${WORKER_CX7_IB} present"
   else
     error "worker RoCE device '${WORKER_CX7_IB}' not in ibv_devices — fix WORKER_CX7_IB"
