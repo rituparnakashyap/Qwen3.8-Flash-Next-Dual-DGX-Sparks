@@ -84,7 +84,19 @@ def add_aliases(quant_config: dict, num_hidden_layers: int) -> bool:
 # FP8_BLOCK_SCALES is supported only because files/patch_modelopt_fp8_block_moe.py
 # adds that branch; stock vLLM (image and upstream main) would build an
 # unquantized MoE and die at load.
-SUPPORTED_MOE_ALGOS = {"FP8", "NVFP4", "W4A16_NVFP4", "MXFP8", "FP8_BLOCK_SCALES"}
+# FP8_PB_WO ("FP8 Per-Block Weight-Only") is the SAME quantization as
+# FP8_BLOCK_SCALES, renamed by nvidia on 2026-09-05 in commit fc694b54 ("Fix MTP
+# serving metadata and instructions"). Only config.json was relabelled; the
+# legacy hf_quant_config.json sidecar in the same snapshot still says
+# FP8_BLOCK_SCALES, so the checkpoint contradicts itself and mtp_moe_algo()
+# below -- which reads config.json first -- sees the new name.
+# Verified equivalent from the tensors, not from the label:
+#   gate_proj.weight            F8_E4M3  [640, 2560]
+#   gate_proj.weight_scale_inv  BF16     [5, 20]     -> 640/5 = 2560/20 = 128
+# i.e. 128x128 block scales either way, and `producer` is byte-identical across
+# the two revisions, so the weights were relabelled and not requantised.
+SUPPORTED_MOE_ALGOS = {"FP8", "NVFP4", "W4A16_NVFP4", "MXFP8",
+                       "FP8_BLOCK_SCALES", "FP8_PB_WO"}
 
 
 def mtp_moe_algo(snapshot_dir: str) -> str:

@@ -80,15 +80,20 @@ DISPATCH = """            if quant_algo == "MXFP8":
                     quant_config=self.mxfp8_config,
                     moe_config=layer.moe_config,
                 )
-            if quant_algo == "FP8_BLOCK_SCALES":
+            if quant_algo in ("FP8_BLOCK_SCALES", "FP8_PB_WO"):
+                # FP8_PB_WO is nvidia's 2026-09-05 rename of FP8_BLOCK_SCALES
+                # (commit fc694b54). Same 128x128 block-scaled FP8 weights --
+                # only config.json was relabelled, hf_quant_config.json in the
+                # same snapshot still carries the old name.
                 # Imported lazily: modelopt.py deliberately does not import fp8.py
                 # at module scope.
                 from vllm.model_executor.layers.quantization.fp8 import Fp8MoEMethod
 
                 logger.info_once(
-                    "Routed experts %s use FP8_BLOCK_SCALES; building them with "
-                    "Fp8MoEMethod (block-quantized).",
+                    "Routed experts %s use %s (block-quantized FP8); building "
+                    "them with Fp8MoEMethod.",
                     prefix,
+                    quant_algo,
                 )
                 return Fp8MoEMethod(
                     quant_config=self._fp8_block_scales_config(prefix),
